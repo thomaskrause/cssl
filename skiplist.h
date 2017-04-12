@@ -35,7 +35,7 @@
 #include <math.h>
 
 // data list node
-typedef struct {
+typedef struct DataNode {
   uint32_t key;
   struct DataNode *next;
 } DataNode;
