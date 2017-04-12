@@ -22,7 +22,5 @@ install(TARGETS cssl cssl_demo
         ARCHIVE DESTINATION lib
        INCLUDES DESTINATION include
 )
-install(DIRECTORY . DESTINATION include/cssl
-        FILES_MATCHING PATTERN "*.h"
-)
+install(FILES skiplist.h DESTINATION include/cssl)
 
