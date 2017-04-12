@@ -63,7 +63,7 @@ typedef struct {
 typedef struct {
   size_t startIdx;
   size_t endIdx;
-  uint32_t  count;
+  bool  found;
 } RangeSearchResult;
 
 SkipList*         createSkipList(uint8_t maxLevel, uint8_t skip);

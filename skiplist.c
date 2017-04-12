@@ -263,21 +263,20 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
   while (startKey < slist->flanes[curPos] && curPos > start_of_flane)
     curPos--;
 
-  result.count = 0;
+  result.found = false;
 
   ProxyNode* proxy = slist->flane_pointers[curPos - slist->starts_of_flanes[0]];
-  bool startIdxValid = false;
   for (uint8_t i = 0; i < slist->skip; i++) {
     if (startKey <= proxy->keys[i]) {
       result.startIdx = ((curPos - start_of_flane) * slist->skip) + i;
-      startIdxValid = true;
+      result.found = true;
       break;
     }
   }
 
-  if(!startIdxValid)
+  if(!result.found)
    {
-     if(proxy->keys[slist->skip - 1] == INT_MAX)
+     if(proxy->keys[slist->skip - 1] == INT_MAX || proxy->keys[slist->skip - 1] < startKey)
      {
        // no valid start position found in proxy and no next node available, thus we can't find anything
        return result;
@@ -298,28 +297,28 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
         _mm256_loadu_si256((__m256i const *) &slist->flanes[curPos]));
     res      = _mm256_cmp_ps(avx_sreg, avx_creg, 30);
     bitmask  = _mm256_movemask_ps(res);
+    // break if segment not matched fully
     if (bitmask < 0xff) break;
     curPos += SIMD_SEGMENTS; rPos += SIMD_SEGMENTS;
-    result.count += (SIMD_SEGMENTS *  slist->skip);
+    result.found = true;
   }
   itemsInFlane += SIMD_SEGMENTS;
 
-  while(bitmask != 0 && rPos < itemsInFlane) {
-    ++rPos;
-    result.count += slist->skip;
-    bitmask = bitmask >> 1;
+  // iterate to the last valid position in the segment
+  while (endKey >= slist->flanes[++curPos] && rPos < itemsInFlane) {
+      rPos++;
   }
+  // don't usr curPos after this loop
 
   result.endIdx = rPos * slist->skip;
   proxy = slist->flane_pointers[rPos];
   if(proxy != NULL) {
     // find all additional items which are still inside the end of the range
-    for (uint8_t i = 1; i < slist->skip && proxy->keys[i] <= endKey; i++) {
+    for (uint8_t i = 0; i < slist->skip && proxy->keys[i] <= endKey; i++) {
       result.endIdx = (rPos*slist->skip) + i;
-      result.count++;
+      result.found = true;
     }
   }
-
 
   return result;
 }
