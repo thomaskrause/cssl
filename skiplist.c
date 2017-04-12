@@ -231,7 +231,8 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
   // should be used as starting position for search
   __m256 avx_creg, res, avx_sreg;
   RangeSearchResult result;
-  uint32_t level, bitmask;
+  uint32_t level;
+  uint32_t bitmask = 0;
   uint32_t curPos = 0; uint32_t rPos = 0; uint32_t first = 0;
   uint32_t last = slist->items_per_level[slist->max_level - 1] - 1;
   uint32_t middle = 0;
@@ -268,7 +269,7 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
   bool startIdxValid = false;
   for (uint8_t i = 0; i < slist->skip; i++) {
     if (startKey <= proxy->keys[i]) {
-      result.startIdx = curPos - start_of_flane + i;
+      result.startIdx = ((curPos - start_of_flane) * slist->skip) + i;
       startIdxValid = true;
       break;
     }
@@ -301,23 +302,21 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
     curPos += SIMD_SEGMENTS; rPos += SIMD_SEGMENTS;
     result.count += (SIMD_SEGMENTS *  slist->skip);
   }
-  curPos--;rPos--;
   itemsInFlane += SIMD_SEGMENTS;
 
-  while (endKey >= slist->flanes[++curPos] && rPos < itemsInFlane) {
-    rPos++;
+  while(bitmask != 0 && rPos < itemsInFlane) {
+    ++rPos;
+    result.count += slist->skip;
+    bitmask = bitmask >> 1;
   }
 
+  result.endIdx = rPos * slist->skip;
   proxy = slist->flane_pointers[rPos];
-  if(proxy == NULL) {
-    result.endIdx = rPos;
-  } else {
-    result.endIdx = rPos + slist->skip - 1;
-    for (uint8_t i = 1; i < slist->skip; i++) {
-      if (endKey < proxy->keys[i]) {
-        result.endIdx = rPos + i - 1;
-        break;
-      }
+  if(proxy != NULL) {
+    // find all additional items which are still inside the end of the range
+    for (uint8_t i = 1; i < slist->skip && proxy->keys[i] <= endKey; i++) {
+      result.endIdx = (rPos*slist->skip) + i;
+      result.count++;
     }
   }
 
