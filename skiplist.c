@@ -265,13 +265,28 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
   result.count = 0;
 
   ProxyNode* proxy = slist->flane_pointers[curPos - slist->starts_of_flanes[0]];
-  result.start = (DataNode*) proxy->pointers[slist->skip - 1]->next;
+  bool startIdxValid = false;
   for (uint8_t i = 0; i < slist->skip; i++) {
     if (startKey <= proxy->keys[i]) {
-      result.start = proxy->pointers[i];
+      result.startIdx = curPos - start_of_flane + i;
+      startIdxValid = true;
       break;
     }
   }
+
+  if(!startIdxValid)
+   {
+     if(proxy->keys[slist->skip - 1] == INT_MAX)
+     {
+       // no valid start position found in proxy and no next node available, thus we can't find anything
+       return result;
+     }
+     else
+     {
+       // set next node of end of proxy as starting point for the search
+       result.startIdx =  curPos - start_of_flane + slist->skip;
+     }
+   }
 
   // search for the range's last matching node
   avx_sreg = _mm256_castsi256_ps(_mm256_set1_epi32(endKey));
@@ -294,13 +309,18 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
   }
 
   proxy = slist->flane_pointers[rPos];
-  result.end = proxy->pointers[slist->skip - 1];
-  for (uint8_t i = 1; i < slist->skip; i++) {
-    if (endKey < proxy->keys[i]) {
-      result.end = proxy->pointers[i - 1];
-      break;
+  if(proxy == NULL) {
+    result.endIdx = rPos;
+  } else {
+    result.endIdx = rPos + slist->skip - 1;
+    for (uint8_t i = 1; i < slist->skip; i++) {
+      if (endKey < proxy->keys[i]) {
+        result.endIdx = rPos + i - 1;
+        break;
+      }
     }
   }
+
 
   return result;
 }

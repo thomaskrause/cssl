@@ -61,8 +61,8 @@ typedef struct {
 
 // result of a range query
 typedef struct {
-  DataNode* start;
-  DataNode* end;
+  size_t startIdx;
+  size_t endIdx;
   uint32_t  count;
 } RangeSearchResult;
 
