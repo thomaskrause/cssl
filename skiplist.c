@@ -67,6 +67,9 @@ void findAndInsertIntoProxyNode(SkipList* slist, DataNode* node) {
 // Inserts a new element into the given skip list (bulk insert)
 void insertElement(SkipList* slist, uint32_t key) {
   DataNode *new_node = newNode(key);
+
+  new_node->idx = slist->num_elements;
+
   bool nodeInserted = true;
   bool flaneInserted = false;
 
@@ -262,13 +265,14 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
   while (startKey < slist->flanes[curPos] && curPos > start_of_flane)
     curPos--;
 
-  result.count = 0;
+  result.found = false;
 
   ProxyNode* proxy = slist->flane_pointers[curPos - slist->starts_of_flanes[0]];
   result.start = (DataNode*) proxy->pointers[slist->skip - 1]->next;
   for (uint8_t i = 0; i < slist->skip; i++) {
     if (startKey <= proxy->keys[i]) {
       result.start = proxy->pointers[i];
+      result.found = true;
       break;
     }
   }
@@ -284,21 +288,25 @@ RangeSearchResult searchRange(SkipList* slist, uint32_t startKey, uint32_t endKe
     bitmask  = _mm256_movemask_ps(res);
     if (bitmask < 0xff) break;
     curPos += SIMD_SEGMENTS; rPos += SIMD_SEGMENTS;
-    result.count += (SIMD_SEGMENTS *  slist->skip);
+    result.found = true;
   }
-  curPos--;rPos--;
   itemsInFlane += SIMD_SEGMENTS;
 
-  while (endKey >= slist->flanes[++curPos] && rPos < itemsInFlane) {
+  while (endKey >= slist->flanes[curPos++] && (rPos+1) < itemsInFlane) {
     rPos++;
   }
 
   proxy = slist->flane_pointers[rPos];
-  result.end = proxy->pointers[slist->skip - 1];
-  for (uint8_t i = 1; i < slist->skip; i++) {
-    if (endKey < proxy->keys[i]) {
-      result.end = proxy->pointers[i - 1];
-      break;
+  if(proxy == NULL) {
+    // the last element of the list is smaller than the end key, thus use it as result
+    result.end = slist->tail;
+  } else {
+    result.end = proxy->pointers[slist->skip - 1];
+    for (uint8_t i = 1; i < slist->skip; i++) {
+      if (endKey < proxy->keys[i]) {
+        result.end = proxy->pointers[i - 1];
+        break;
+      }
     }
   }
 

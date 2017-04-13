@@ -35,8 +35,9 @@
 #include <math.h>
 
 // data list node
-typedef struct {
+typedef struct DataNode {
   uint32_t key;
+  uint32_t idx;
   struct DataNode *next;
 } DataNode;
 
@@ -63,7 +64,7 @@ typedef struct {
 typedef struct {
   DataNode* start;
   DataNode* end;
-  uint32_t  count;
+  bool  found;
 } RangeSearchResult;
 
 SkipList*         createSkipList(uint8_t maxLevel, uint8_t skip);
